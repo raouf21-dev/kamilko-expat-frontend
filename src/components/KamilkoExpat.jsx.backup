@@ -1,0 +1,913 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Menu, X, Globe, User, FileText, Clock, MessageSquare, BookOpen, LogOut, Upload, CheckCircle, Circle, AlertCircle, Phone, Mail, MapPin, Facebook, Instagram, Youtube, CreditCard, Shield, GraduationCap, Calendar, Award, Briefcase, RefreshCw, Languages } from 'lucide-react';
+import { authAPI, dashboardAPI, applicationAPI, documentsAPI, messagesAPI, lessonsAPI, paymentsAPI, contactAPI } from '../services/api';
+import LoginPage from './LoginPage';
+
+const KamilkoExpat = () => {
+  const [currentLang, setCurrentLang] = useState('en');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState('home');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [user, setUser] = useState(null);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [showRegister, setShowRegister] = useState(false);
+  const [registerData, setRegisterData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    password_confirmation: '',
+    phone: ''
+  });
+  const [registerError, setRegisterError] = useState('');
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [registerSuccess, setRegisterSuccess] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordSuccess, setForgotPasswordSuccess] = useState(false);
+  const [forgotPasswordError, setForgotPasswordError] = useState('');
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const token = localStorage.getItem('auth_token');
+    if (token) {
+      authAPI.me()
+        .then(response => {
+          setUser(response.data);
+          setIsLoggedIn(true);
+        })
+        .catch(() => {
+          localStorage.removeItem('auth_token');
+        });
+    }
+  }, []);
+
+  // Fetch dashboard data when logged in
+  useEffect(() => {
+    if (isLoggedIn && currentPage === 'portal') {
+      dashboardAPI.getData()
+        .then(response => {
+          setDashboardData(response.data);
+        })
+        .catch(error => {
+          console.error('Failed to fetch dashboard data:', error);
+        });
+    }
+  }, [isLoggedIn, currentPage]);
+
+  const handleLogin = async (e) => {
+    e?.preventDefault();
+    setLoginError('');
+    setLoginLoading(true);
+
+    try {
+      const response = await authAPI.login(loginEmail, loginPassword);
+      localStorage.setItem('auth_token', response.data.token);
+      setUser(response.data.user);
+      setIsLoggedIn(true);
+      setCurrentPage('portal');
+      setLoginEmail('');
+      setLoginPassword('');
+    } catch (error) {
+      // Handle validation errors
+      if (error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        const errorMessages = Object.values(errors).flat().join(' ');
+        setLoginError(errorMessages);
+      } else {
+        setLoginError(error.response?.data?.message || 'Login failed. Please check your credentials.');
+      }
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await authAPI.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      localStorage.removeItem('auth_token');
+      setIsLoggedIn(false);
+      setUser(null);
+      setDashboardData(null);
+      setCurrentPage('home');
+    }
+  };
+
+  const handleRegister = async (e) => {
+    e?.preventDefault();
+    setRegisterError('');
+    setRegisterLoading(true);
+
+    // Validate passwords match
+    if (registerData.password !== registerData.password_confirmation) {
+      setRegisterError('Passwords do not match');
+      setRegisterLoading(false);
+      return;
+    }
+
+    try {
+      await authAPI.register(registerData);
+      setRegisterSuccess(true);
+      setRegisterData({
+        name: '',
+        email: '',
+        password: '',
+        password_confirmation: '',
+        phone: ''
+      });
+    } catch (error) {
+      // Handle validation errors
+      if (error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        const errorMessages = Object.values(errors).flat().join(' ');
+        setRegisterError(errorMessages);
+      } else {
+        setRegisterError(error.response?.data?.message || 'Registration failed. Please try again.');
+      }
+    } finally {
+      setRegisterLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (e) => {
+    e?.preventDefault();
+    setForgotPasswordError('');
+    setForgotPasswordLoading(true);
+
+    try {
+      await contactAPI.submit({
+        email: forgotEmail,
+        message: `Password reset request for: ${forgotEmail}`,
+        type: 'password_reset'
+      });
+      setForgotPasswordSuccess(true);
+      setForgotEmail('');
+    } catch (error) {
+      setForgotPasswordError(error.response?.data?.message || 'Failed to send reset request. Please try again.');
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
+
+  // Memoized input handlers to prevent re-renders
+  const handleLoginEmailChange = useCallback((e) => {
+    setLoginEmail(e.target.value);
+  }, []);
+
+  const handleLoginPasswordChange = useCallback((e) => {
+    setLoginPassword(e.target.value);
+  }, []);
+
+  const handleForgotEmailChange = useCallback((e) => {
+    setForgotEmail(e.target.value);
+  }, []);
+
+  const handleRegisterChange = useCallback((field) => (e) => {
+    setRegisterData(prev => ({...prev, [field]: e.target.value}));
+  }, []);
+
+  const translations = {
+    en: {
+      siteName: 'Kamilko Expat',
+      tagline: 'Your Gateway to Portuguese Residency',
+      nav: {
+        home: 'Home',
+        services: 'Services',
+        pricing: 'Pricing',
+        contact: 'Contact',
+        portal: 'Client Portal',
+        login: 'Login'
+      },
+      hero: {
+        title: 'Your Bridge to Portuguese Residency',
+        subtitle: 'Expert assistance for residence permits, citizenship, and settling in Portugal. Specialized support in Arabic, French, and English.',
+        cta: 'Start Your Journey',
+        cta2: 'Learn More'
+      },
+      services: {
+        title: 'Our Services',
+        subtitle: 'Complete support for your Portuguese residency journey',
+        nif: { title: 'NIF Application', desc: 'Get your Portuguese tax identification number quickly.' },
+        niss: { title: 'NISS Registration', desc: 'Social security number registration.' },
+        courses: { title: 'Course Enrollment', desc: 'Enrollment in certified courses.' },
+        aima: { title: 'AIMA Appointments', desc: 'We help you secure AIMA appointments.' },
+        citizenship: { title: 'Citizenship Application', desc: 'Complete citizenship assistance.' },
+        business: { title: 'Business Activity', desc: 'Set up your business in Portugal.' },
+        renewal: { title: 'Permit Renewals', desc: 'Hassle-free permit renewal services.' },
+        portuguese: { title: 'Learn Portuguese', desc: 'Portuguese lessons for Arabic speakers.' }
+      },
+      pricing: {
+        title: 'Transparent Pricing',
+        subtitle: 'Choose the package that fits your needs',
+        starter: { name: 'Starter Package', price: '€399' },
+        complete: { name: 'Complete Package', price: '€799', popular: 'Most Popular' },
+        premium: { name: 'Premium Package', price: '€1,299' },
+        cta: 'Get Started'
+      },
+      portal: {
+        title: 'Client Portal',
+        dashboard: 'Dashboard',
+        documents: 'My Documents',
+        progress: 'Progress',
+        messages: 'Messages',
+        learning: 'Portuguese Learning',
+        logout: 'Logout',
+        welcome: 'Welcome back'
+      },
+      contact: {
+        title: 'Get In Touch',
+        subtitle: 'Ready to start your Portuguese journey? Contact us today!',
+        whatsapp: 'WhatsApp Us',
+        send: 'Send Message'
+      }
+    },
+    fr: {
+      siteName: 'Kamilko Expat',
+      tagline: 'Votre Porte vers la Résidence Portugaise',
+      nav: {
+        home: 'Accueil',
+        services: 'Services',
+        pricing: 'Tarifs',
+        contact: 'Contact',
+        portal: 'Portail Client',
+        login: 'Connexion'
+      },
+      hero: {
+        title: 'Votre Pont vers la Résidence Portugaise',
+        subtitle: 'Assistance experte pour les permis de résidence au Portugal. Support en arabe, français et anglais.',
+        cta: 'Commencer',
+        cta2: 'En Savoir Plus'
+      },
+      services: {
+        title: 'Nos Services',
+        subtitle: 'Soutien complet pour votre résidence portugaise',
+        nif: { title: 'Demande NIF', desc: 'Obtenez votre NIF rapidement.' },
+        niss: { title: 'Inscription NISS', desc: 'Numéro de sécurité sociale.' },
+        courses: { title: 'Inscription aux Cours', desc: 'Cours certifiés requis.' },
+        aima: { title: 'Rendez-vous AIMA', desc: 'Nous vous aidons avec AIMA.' },
+        citizenship: { title: 'Citoyenneté', desc: 'Assistance complète.' },
+        business: { title: 'Activité Commerciale', desc: 'Créez votre entreprise.' },
+        renewal: { title: 'Renouvellements', desc: 'Renouvellement facile.' },
+        portuguese: { title: 'Apprendre le Portugais', desc: 'Cours pour arabophones.' }
+      },
+      pricing: {
+        title: 'Tarifs Transparents',
+        subtitle: 'Choisissez votre forfait',
+        starter: { name: 'Forfait Débutant', price: '399€' },
+        complete: { name: 'Forfait Complet', price: '799€', popular: 'Le Plus Populaire' },
+        premium: { name: 'Forfait Premium', price: '1 299€' },
+        cta: 'Commencer'
+      },
+      portal: {
+        title: 'Portail Client',
+        dashboard: 'Tableau de Bord',
+        documents: 'Mes Documents',
+        progress: 'Progrès',
+        messages: 'Messages',
+        learning: 'Apprentissage',
+        logout: 'Déconnexion',
+        welcome: 'Bon retour'
+      },
+      contact: {
+        title: 'Contactez-Nous',
+        subtitle: 'Prêt à commencer? Contactez-nous!',
+        whatsapp: 'WhatsApp',
+        send: 'Envoyer'
+      }
+    },
+    ar: {
+      siteName: 'كاميلكو إكسبات',
+      tagline: 'بوابتك نحو الإقامة البرتغالية',
+      nav: {
+        home: 'الرئيسية',
+        services: 'الخدمات',
+        pricing: 'الأسعار',
+        contact: 'اتصل بنا',
+        portal: 'بوابة العملاء',
+        login: 'تسجيل الدخول'
+      },
+      hero: {
+        title: 'جسرك نحو الإقامة البرتغالية',
+        subtitle: 'مساعدة متخصصة في تصاريح الإقامة والجنسية في البرتغال. دعم باللغات العربية والفرنسية والإنجليزية.',
+        cta: 'ابدأ رحلتك',
+        cta2: 'اعرف المزيد'
+      },
+      services: {
+        title: 'خدماتنا',
+        subtitle: 'دعم شامل لرحلة إقامتك البرتغالية',
+        nif: { title: 'طلب NIF', desc: 'احصل على رقم NIF بسرعة.' },
+        niss: { title: 'تسجيل NISS', desc: 'رقم الضمان الاجتماعي.' },
+        courses: { title: 'التسجيل في الدورات', desc: 'دورات معتمدة مطلوبة.' },
+        aima: { title: 'مواعيد AIMA', desc: 'نساعدك في مواعيد AIMA.' },
+        citizenship: { title: 'طلب الجنسية', desc: 'مساعدة كاملة.' },
+        business: { title: 'النشاط التجاري', desc: 'أنشئ عملك التجاري.' },
+        renewal: { title: 'تجديد التصاريح', desc: 'تجديد سهل.' },
+        portuguese: { title: 'تعلم البرتغالية', desc: 'دروس للناطقين بالعربية.' }
+      },
+      pricing: {
+        title: 'أسعار شفافة',
+        subtitle: 'اختر الباقة المناسبة',
+        starter: { name: 'الباقة الأساسية', price: '399 يورو' },
+        complete: { name: 'الباقة الكاملة', price: '799 يورو', popular: 'الأكثر شعبية' },
+        premium: { name: 'الباقة المميزة', price: '1,299 يورو' },
+        cta: 'ابدأ الآن'
+      },
+      portal: {
+        title: 'بوابة العملاء',
+        dashboard: 'لوحة التحكم',
+        documents: 'مستنداتي',
+        progress: 'التقدم',
+        messages: 'الرسائل',
+        learning: 'تعلم البرتغالية',
+        logout: 'تسجيل الخروج',
+        welcome: 'مرحباً بعودتك'
+      },
+      contact: {
+        title: 'تواصل معنا',
+        subtitle: 'هل أنت مستعد؟ اتصل بنا اليوم!',
+        whatsapp: 'واتساب',
+        send: 'إرسال'
+      }
+    },
+    pt: {
+      siteName: 'Kamilko Expat',
+      tagline: 'Sua Porta para a Residência Portuguesa',
+      nav: {
+        home: 'Início',
+        services: 'Serviços',
+        pricing: 'Preços',
+        contact: 'Contato',
+        portal: 'Portal Cliente',
+        login: 'Entrar'
+      },
+      hero: {
+        title: 'Sua Ponte para a Residência Portuguesa',
+        subtitle: 'Assistência especializada para residência em Portugal. Suporte em árabe, francês e inglês.',
+        cta: 'Começar',
+        cta2: 'Saiba Mais'
+      },
+      services: {
+        title: 'Nossos Serviços',
+        subtitle: 'Suporte completo para sua residência',
+        nif: { title: 'Pedido NIF', desc: 'Obtenha seu NIF rapidamente.' },
+        niss: { title: 'Registro NISS', desc: 'Número de segurança social.' },
+        courses: { title: 'Inscrição Cursos', desc: 'Cursos certificados.' },
+        aima: { title: 'Agendamentos AIMA', desc: 'Ajudamos com AIMA.' },
+        citizenship: { title: 'Cidadania', desc: 'Assistência completa.' },
+        business: { title: 'Atividade Empresarial', desc: 'Configure sua empresa.' },
+        renewal: { title: 'Renovações', desc: 'Renovação fácil.' },
+        portuguese: { title: 'Aprender Português', desc: 'Aulas para árabes.' }
+      },
+      pricing: {
+        title: 'Preços Transparentes',
+        subtitle: 'Escolha seu pacote',
+        starter: { name: 'Pacote Inicial', price: '€399' },
+        complete: { name: 'Pacote Completo', price: '€799', popular: 'Mais Popular' },
+        premium: { name: 'Pacote Premium', price: '€1.299' },
+        cta: 'Começar'
+      },
+      portal: {
+        title: 'Portal do Cliente',
+        dashboard: 'Painel',
+        documents: 'Documentos',
+        progress: 'Progresso',
+        messages: 'Mensagens',
+        learning: 'Aprender',
+        logout: 'Sair',
+        welcome: 'Bem-vindo'
+      },
+      contact: {
+        title: 'Entre em Contato',
+        subtitle: 'Pronto para começar? Contacte-nos!',
+        whatsapp: 'WhatsApp',
+        send: 'Enviar'
+      }
+    }
+  };
+
+  const t = translations[currentLang];
+  const isRTL = currentLang === 'ar';
+
+  // Service icon mapping
+  const serviceIcons = {
+    nif: CreditCard,
+    niss: Shield,
+    courses: GraduationCap,
+    aima: Calendar,
+    citizenship: Award,
+    business: Briefcase,
+    renewal: RefreshCw,
+    portuguese: Languages
+  };
+
+  const NavBar = () => (
+    <nav className={`bg-white shadow-md fixed w-full top-0 z-50 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          <div className="flex items-center">
+            <span className="text-2xl font-bold text-blue-900">{t.siteName}</span>
+          </div>
+          
+          <div className="hidden md:flex items-center space-x-8">
+            <button onClick={() => setCurrentPage('home')} className="text-gray-700 hover:text-blue-900">{t.nav.home}</button>
+            <button onClick={() => setCurrentPage('services')} className="text-gray-700 hover:text-blue-900">{t.nav.services}</button>
+            <button onClick={() => setCurrentPage('pricing')} className="text-gray-700 hover:text-blue-900">{t.nav.pricing}</button>
+            <button onClick={() => setCurrentPage('contact')} className="text-gray-700 hover:text-blue-900">{t.nav.contact}</button>
+            {isLoggedIn ? (
+              <button onClick={() => setCurrentPage('portal')} className="bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800">{t.nav.portal}</button>
+            ) : (
+              <button onClick={() => setCurrentPage('login')} className="bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800">{t.nav.login}</button>
+            )}
+            
+            <div className="relative group">
+              <button className="flex items-center space-x-1 text-gray-700 hover:text-blue-900">
+                <Globe className="w-5 h-5" />
+                <span className="uppercase text-sm">{currentLang}</span>
+              </button>
+              <div className="absolute right-0 mt-2 w-32 bg-white rounded-lg shadow-lg hidden group-hover:block">
+                <button onClick={() => setCurrentLang('en')} className="block w-full text-left px-4 py-2 hover:bg-gray-100">English</button>
+                <button onClick={() => setCurrentLang('fr')} className="block w-full text-left px-4 py-2 hover:bg-gray-100">Français</button>
+                <button onClick={() => setCurrentLang('ar')} className="block w-full text-left px-4 py-2 hover:bg-gray-100">العربية</button>
+                <button onClick={() => setCurrentLang('pt')} className="block w-full text-left px-4 py-2 hover:bg-gray-100">Português</button>
+              </div>
+            </div>
+          </div>
+
+          <div className="md:hidden">
+            <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-white border-t">
+          <div className="px-4 pt-2 pb-4 space-y-2">
+            <button onClick={() => { setCurrentPage('home'); setMobileMenuOpen(false); }} className="block w-full text-left py-2">{t.nav.home}</button>
+            <button onClick={() => { setCurrentPage('pricing'); setMobileMenuOpen(false); }} className="block w-full text-left py-2">{t.nav.pricing}</button>
+            <button onClick={() => { setCurrentPage('contact'); setMobileMenuOpen(false); }} className="block w-full text-left py-2">{t.nav.contact}</button>
+            <div className="pt-2 border-t">
+              <button onClick={() => setCurrentLang('en')} className="block w-full text-left py-2">English</button>
+              <button onClick={() => setCurrentLang('fr')} className="block w-full text-left py-2">Français</button>
+              <button onClick={() => setCurrentLang('ar')} className="block w-full text-left py-2">العربية</button>
+              <button onClick={() => setCurrentLang('pt')} className="block w-full text-left py-2">Português</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </nav>
+  );
+
+  const HomePage = () => (
+    <div className={isRTL ? 'rtl' : 'ltr'} dir={isRTL ? 'rtl' : 'ltr'}>
+      <section className="pt-24 pb-12 bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h1 className="text-4xl md:text-6xl font-bold mb-6">{t.hero.title}</h1>
+            <p className="text-xl md:text-2xl mb-8 text-blue-100 max-w-3xl mx-auto">{t.hero.subtitle}</p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button onClick={() => setCurrentPage('contact')} className="bg-amber-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-amber-600 transition">
+                {t.hero.cta}
+              </button>
+              <button onClick={() => setCurrentPage('services')} className="bg-white text-blue-900 px-8 py-3 rounded-lg text-lg font-semibold hover:bg-gray-100 transition">
+                {t.hero.cta2}
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">{t.services.title}</h2>
+            <p className="text-xl text-gray-600">{t.services.subtitle}</p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-6">
+            {Object.entries(t.services).filter(([key]) => !['title', 'subtitle'].includes(key)).map(([key, service]) => {
+              const IconComponent = serviceIcons[key] || FileText;
+              return (
+                <div key={key} className="bg-white p-6 rounded-lg shadow-md hover:shadow-xl transition w-full sm:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] flex-shrink-0">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                    <IconComponent className="w-6 h-6 text-blue-900" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 text-gray-900">{service.title}</h3>
+                  <p className="text-gray-600">{service.desc}</p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-16 bg-blue-900 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4">{t.contact.title}</h2>
+          <p className="text-xl mb-8 text-blue-100">{t.contact.subtitle}</p>
+          <button onClick={() => setCurrentPage('contact')} className="bg-amber-500 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-amber-600 transition">
+            {t.contact.whatsapp}
+          </button>
+        </div>
+      </section>
+    </div>
+  );
+
+  const PricingPage = () => (
+    <div className={`pt-24 pb-16 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">{t.pricing.title}</h1>
+          <p className="text-xl text-gray-600">{t.pricing.subtitle}</p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="bg-white rounded-lg shadow-lg p-8 border-2 border-gray-200">
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">{t.pricing.starter.name}</h3>
+            <div className="text-4xl font-bold text-blue-900 mb-6">{t.pricing.starter.price}</div>
+            <button onClick={() => setCurrentPage('contact')} className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition">
+              {t.pricing.cta}
+            </button>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-xl p-8 border-2 border-amber-500 relative transform md:scale-105">
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+              <span className="bg-amber-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                {t.pricing.complete.popular}
+              </span>
+            </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">{t.pricing.complete.name}</h3>
+            <div className="text-4xl font-bold text-blue-900 mb-6">{t.pricing.complete.price}</div>
+            <button onClick={() => setCurrentPage('contact')} className="w-full bg-amber-500 text-white py-3 rounded-lg font-semibold hover:bg-amber-600 transition">
+              {t.pricing.cta}
+            </button>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-lg p-8 border-2 border-gray-200">
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">{t.pricing.premium.name}</h3>
+            <div className="text-4xl font-bold text-blue-900 mb-6">{t.pricing.premium.price}</div>
+            <button onClick={() => setCurrentPage('contact')} className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition">
+              {t.pricing.cta}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const ContactPage = () => (
+    <div className={`pt-24 pb-16 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">{t.contact.title}</h1>
+          <p className="text-xl text-gray-600">{t.contact.subtitle}</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-green-50 rounded-lg p-8 border-2 border-green-500">
+            <Phone className="w-8 h-8 text-green-600 mb-4" />
+            <h3 className="text-xl font-semibold mb-2">{t.contact.whatsapp}</h3>
+            <p className="text-2xl font-bold text-green-600">+351 912 345 678</p>
+          </div>
+
+          <div className="bg-blue-50 rounded-lg p-8 border-2 border-blue-500">
+            <Mail className="w-8 h-8 text-blue-600 mb-4" />
+            <h3 className="text-xl font-semibold mb-2">Email</h3>
+                          <p className="text-lg text-blue-600">info@kamilkoexpat.com</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const LoginPage = () => (
+    <div className={`pt-24 pb-16 min-h-screen bg-gray-50 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+      <div className="max-w-md mx-auto px-4">
+        <div className="bg-white rounded-lg shadow-xl p-8">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
+              <User className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              {showForgotPassword ? 'Reset Password' : showRegister ? 'Register' : 'Client Login'}
+            </h1>
+          </div>
+
+          {showForgotPassword ? (
+            forgotPasswordSuccess ? (
+              <div className="space-y-6">
+                <div className="p-6 bg-green-50 border border-green-200 rounded-lg text-center">
+                  <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="w-10 h-10 text-white" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-green-900 mb-2">Request Sent!</h3>
+                  <p className="text-green-800 mb-4">We've received your password reset request.</p>
+                  <p className="text-green-700">Our team will contact you via email within 24 hours to help you reset your password.</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setForgotPasswordSuccess(false);
+                  }}
+                  className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition"
+                >
+                  Back to Login
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <p className="text-gray-600 text-center">Enter your email address and we'll help you reset your password.</p>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                  <input
+                    type="email"
+                    value={forgotEmail}
+                    onChange={handleForgotEmailChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                    placeholder="your@email.com"
+                    autoComplete="email"
+                  />
+                </div>
+                {forgotPasswordError && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-800">{forgotPasswordError}</p>
+                  </div>
+                )}
+                <button
+                  onClick={handleForgotPassword}
+                  disabled={forgotPasswordLoading || !forgotEmail}
+                  className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {forgotPasswordLoading ? 'Sending...' : 'Send Reset Request'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setForgotPasswordError('');
+                  }}
+                  className="w-full text-blue-900 hover:text-blue-700 font-medium"
+                >
+                  Back to Login
+                </button>
+              </div>
+            )
+          ) : !showRegister ? (
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={handleLoginEmailChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="your@email.com"
+                  autoComplete="email"
+                />
+              </div>
+              <div>
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm font-medium text-gray-700">Password</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-sm text-blue-900 hover:text-blue-700"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={handleLoginPasswordChange}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="password"
+                  autoComplete="current-password"
+                />
+              </div>
+              {loginError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800">{loginError}</p>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleLogin}
+                disabled={loginLoading || !loginEmail || !loginPassword}
+                className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loginLoading ? 'Logging in...' : 'Login'}
+              </button>
+            </div>
+          ) : registerSuccess ? (
+            <div className="space-y-6">
+              <div className="p-6 bg-green-50 border border-green-200 rounded-lg text-center">
+                <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-10 h-10 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold text-green-900 mb-2">Registration Successful!</h3>
+                <p className="text-green-800 mb-4">Thank you for registering with Kamilko Expat.</p>
+                <p className="text-green-700">We will review your application and contact you within 24-48 hours to activate your account and discuss your residency needs.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowRegister(false);
+                  setRegisterSuccess(false);
+                }}
+                className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition"
+              >
+                Back to Login
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                <input
+                  type="text"
+                  value={registerData.name}
+                  onChange={handleRegisterChange('name')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="John Doe"
+                  autoComplete="name"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={registerData.email}
+                  onChange={handleRegisterChange('email')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="your@email.com"
+                  autoComplete="email"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={registerData.phone}
+                  onChange={handleRegisterChange('phone')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="+351 XXX XXX XXX"
+                  autoComplete="tel"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                <input
+                  type="password"
+                  value={registerData.password}
+                  onChange={handleRegisterChange('password')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="minimum 8 characters"
+                  autoComplete="new-password"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+                <input
+                  type="password"
+                  value={registerData.password_confirmation}
+                  onChange={handleRegisterChange('password_confirmation')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  placeholder="confirm password"
+                  autoComplete="new-password"
+                />
+              </div>
+              {registerError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-800">{registerError}</p>
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={handleRegister}
+                disabled={registerLoading || !registerData.name || !registerData.email || !registerData.password}
+                className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {registerLoading ? 'Registering...' : 'Register'}
+              </button>
+            </div>
+          )}
+
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => {
+                setShowRegister(!showRegister);
+                setRegisterError('');
+                setLoginError('');
+              }}
+              className="text-blue-900 hover:text-blue-700 font-medium"
+            >
+              {showRegister ? 'Already have an account? Login' : "Don't have an account? Register"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const ClientPortal = () => {
+    const [portalPage, setPortalPage] = useState('dashboard');
+
+    return (
+      <div className={`pt-16 min-h-screen bg-gray-50 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+        <div className="flex">
+          <div className="w-64 bg-blue-900 text-white min-h-screen fixed">
+            <div className="p-6">
+              <h2 className="text-2xl font-bold mb-8">{t.portal.title}</h2>
+              <nav className="space-y-2">
+                <button onClick={() => setPortalPage('dashboard')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg ${portalPage === 'dashboard' ? 'bg-blue-800' : 'hover:bg-blue-800'}`}>
+                  <User className="w-5 h-5" />
+                  <span>{t.portal.dashboard}</span>
+                </button>
+                <button onClick={() => setPortalPage('documents')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg ${portalPage === 'documents' ? 'bg-blue-800' : 'hover:bg-blue-800'}`}>
+                  <FileText className="w-5 h-5" />
+                  <span>{t.portal.documents}</span>
+                </button>
+                <button onClick={() => setPortalPage('progress')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg ${portalPage === 'progress' ? 'bg-blue-800' : 'hover:bg-blue-800'}`}>
+                  <Clock className="w-5 h-5" />
+                  <span>{t.portal.progress}</span>
+                </button>
+                <button onClick={() => setPortalPage('messages')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg ${portalPage === 'messages' ? 'bg-blue-800' : 'hover:bg-blue-800'}`}>
+                  <MessageSquare className="w-5 h-5" />
+                  <span>{t.portal.messages}</span>
+                </button>
+                <button onClick={() => setPortalPage('learning')} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg ${portalPage === 'learning' ? 'bg-blue-800' : 'hover:bg-blue-800'}`}>
+                  <BookOpen className="w-5 h-5" />
+                  <span>{t.portal.learning}</span>
+                </button>
+              </nav>
+              <button onClick={handleLogout} className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg hover:bg-blue-800 mt-8">
+                <LogOut className="w-5 h-5" />
+                <span>{t.portal.logout}</span>
+              </button>
+            </div>
+          </div>
+
+          <div className={`flex-1 ${isRTL ? 'mr-64' : 'ml-64'} p-8`}>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">{t.portal.welcome}, Ahmed!</h1>
+            <p className="text-gray-600 mb-8">Application progress: 65%</p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-lg shadow p-6">
+                <Clock className="w-8 h-8 text-blue-900 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Application Status</h3>
+                <p className="text-gray-600">AIMA Appointment Scheduled</p>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <FileText className="w-8 h-8 text-green-500 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Documents</h3>
+                <p className="text-gray-600">3 of 4 uploaded</p>
+              </div>
+
+              <div className="bg-white rounded-lg shadow p-6">
+                <BookOpen className="w-8 h-8 text-amber-500 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Portuguese Learning</h3>
+                <p className="text-gray-600">2 lessons completed</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      <NavBar />
+      {currentPage === 'home' && <HomePage />}
+      {currentPage === 'services' && <HomePage />}
+      {currentPage === 'pricing' && <PricingPage />}
+      {currentPage === 'contact' && <ContactPage />}
+      {currentPage === 'login' && <LoginPage />}
+      {currentPage === 'portal' && isLoggedIn && <ClientPortal />}
+      
+      {!currentPage.includes('portal') && !currentPage.includes('login') && (
+        <footer className={`bg-gray-900 text-white py-12 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+            <h3 className="text-2xl font-bold mb-4">{t.siteName}</h3>
+            <p className="text-gray-400 mb-6">Your Gateway to Portuguese Residency</p>
+            <div className="flex justify-center space-x-6 mb-6">
+              <Facebook className="w-6 h-6 text-gray-400 hover:text-white cursor-pointer" />
+              <Instagram className="w-6 h-6 text-gray-400 hover:text-white cursor-pointer" />
+              <Youtube className="w-6 h-6 text-gray-400 hover:text-white cursor-pointer" />
+            </div>
+            <p className="text-gray-500">© 2025 Kamilko Expat. All rights reserved.</p>
+          </div>
+        </footer>
+      )}
+    </div>
+  );
+};
+
+export default KamilkoExpat;
