@@ -136,9 +136,14 @@ const MessagesView = React.memo(({ messages, handleSendMessage, sendingMessage, 
                         }`}
                       >
                         <p className="text-sm">{msg.message}</p>
-                        <p className="text-xs mt-1 opacity-70">
-                          {new Date(msg.created_at).toLocaleString()}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <p className="text-xs opacity-70">
+                            {new Date(msg.created_at).toLocaleString()}
+                          </p>
+                          {msg.updated_at && msg.created_at !== msg.updated_at && (
+                            <span className="text-xs opacity-60 italic">edited</span>
+                          )}
+                        </div>
                       </div>
                     </div>
                   </div>
