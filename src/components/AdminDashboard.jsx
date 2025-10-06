@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { adminAPI, messagesAPI } from '../services/api';
-import { Users, FileText, CheckCircle, Clock, Search, X, Save, AlertCircle, MessageSquare, Send, Bell, Check, Edit2, Trash2 } from 'lucide-react';
+import { adminAPI, messagesAPI, documentsAPI } from '../services/api';
+import { Users, FileText, CheckCircle, Clock, Search, X, Save, AlertCircle, MessageSquare, Send, Bell, Check, Edit2, Trash2, Eye, Download, Tag, Plus } from 'lucide-react';
 
 // Memoized message input with internal state to prevent re-renders
 const MessageInputForm = React.memo(({ onSend, isSending, editingMessage, onCancelEdit }) => {
@@ -234,6 +234,14 @@ const AdminDashboard = ({ onLogout }) => {
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // Label state
+  const [showAddLabel, setShowAddLabel] = useState(false);
+  const [labelForm, setLabelForm] = useState({
+    label_type: '',
+    amount: '',
+    notes: ''
+  });
+
   // Messaging state
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -256,19 +264,19 @@ const AdminDashboard = ({ onLogout }) => {
   }, [conversations]);
 
   const statusOptions = [
-    { value: 'not_started', label: 'Not Started' },
-    { value: 'documents_pending', label: 'Documents Pending' },
-    { value: 'nif_in_progress', label: 'NIF In Progress' },
-    { value: 'nif_completed', label: 'NIF Completed' },
-    { value: 'niss_in_progress', label: 'NISS In Progress' },
-    { value: 'niss_completed', label: 'NISS Completed' },
-    { value: 'bank_account_in_progress', label: 'Bank Account In Progress' },
-    { value: 'bank_account_completed', label: 'Bank Account Completed' },
-    { value: 'course_in_progress', label: 'Course In Progress' },
-    { value: 'course_completed', label: 'Course Completed' },
-    { value: 'aima_scheduled', label: 'AIMA Scheduled' },
-    { value: 'aima_completed', label: 'AIMA Completed' },
-    { value: 'approved', label: 'Approved' }
+    { value: 'not_started', label: 'Not Started', progress: 0 },
+    { value: 'documents_pending', label: 'Documents Pending', progress: 5 },
+    { value: 'nif_in_progress', label: 'NIF In Progress', progress: 15 },
+    { value: 'nif_completed', label: 'NIF Completed', progress: 25 },
+    { value: 'niss_in_progress', label: 'NISS In Progress', progress: 35 },
+    { value: 'niss_completed', label: 'NISS Completed', progress: 45 },
+    { value: 'bank_account_in_progress', label: 'Bank Account In Progress', progress: 55 },
+    { value: 'bank_account_completed', label: 'Bank Account Completed', progress: 65 },
+    { value: 'course_in_progress', label: 'Course In Progress', progress: 70 },
+    { value: 'course_completed', label: 'Course Completed', progress: 80 },
+    { value: 'aima_scheduled', label: 'AIMA Scheduled', progress: 85 },
+    { value: 'aima_completed', label: 'AIMA Completed', progress: 95 },
+    { value: 'approved', label: 'Approved', progress: 100 }
   ];
 
   useEffect(() => {
@@ -383,6 +391,47 @@ const AdminDashboard = ({ onLogout }) => {
     }
   };
 
+  // Label management functions
+  const handleAddLabel = async () => {
+    if (!selectedUser || !labelForm.label_type) return;
+
+    try {
+      await adminAPI.addUserLabel({
+        user_id: selectedUser,
+        ...labelForm
+      });
+
+      setSuccessMessage('Label added successfully!');
+      setShowAddLabel(false);
+      setLabelForm({ label_type: '', amount: '', notes: '' });
+
+      // Reload user details
+      await loadUserDetails(selectedUser);
+
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      console.error('Failed to add label:', error);
+      alert('Failed to add label. Please try again.');
+    }
+  };
+
+  const handleDeleteLabel = async (labelId) => {
+    if (!window.confirm('Are you sure you want to delete this label?')) return;
+
+    try {
+      await adminAPI.deleteUserLabel(labelId);
+      setSuccessMessage('Label deleted successfully!');
+
+      // Reload user details
+      await loadUserDetails(selectedUser);
+
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      console.error('Failed to delete label:', error);
+      alert('Failed to delete label. Please try again.');
+    }
+  };
+
   // Messaging functions
   const loadConversations = async () => {
     try {
@@ -485,6 +534,41 @@ const AdminDashboard = ({ onLogout }) => {
 
   const handleCancelEdit = useCallback(() => {
     setEditingMessage(null);
+  }, []);
+
+  // Document handlers
+  const handleDocumentView = useCallback(async (id, name) => {
+    try {
+      const response = await documentsAPI.download(id);
+
+      // response.data is already a Blob, just create URL from it
+      const url = window.URL.createObjectURL(response.data);
+      window.open(url, '_blank');
+      // Clean up after a delay to ensure the new tab loads
+      setTimeout(() => window.URL.revokeObjectURL(url), 1000);
+    } catch (error) {
+      console.error('Failed to view document:', error);
+      alert('Failed to view document. Please try again.');
+    }
+  }, []);
+
+  const handleDocumentDownload = useCallback(async (id, name) => {
+    try {
+      const response = await documentsAPI.download(id);
+
+      // response.data is already a Blob, create URL from it
+      const url = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', name);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download document:', error);
+      alert('Failed to download document. Please try again.');
+    }
   }, []);
 
   // Load conversations when switching to messages view
@@ -720,6 +804,124 @@ const AdminDashboard = ({ onLogout }) => {
                   </div>
                 </div>
 
+                {/* User Labels */}
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-semibold flex items-center">
+                      <Tag className="w-5 h-5 mr-2" />
+                      Labels ({userDetails.labels?.length || 0})
+                    </h3>
+                    <button
+                      onClick={() => setShowAddLabel(!showAddLabel)}
+                      className="text-sm bg-blue-900 text-white px-3 py-1 rounded hover:bg-blue-800 flex items-center"
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Add Label
+                    </button>
+                  </div>
+
+                  {/* Add Label Form */}
+                  {showAddLabel && (
+                    <div className="mb-3 p-4 bg-gray-50 rounded-lg border">
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Label Type
+                          </label>
+                          <input
+                            type="text"
+                            value={labelForm.label_type}
+                            onChange={(e) => setLabelForm({ ...labelForm, label_type: e.target.value })}
+                            placeholder="e.g., paid, vip, urgent"
+                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Amount (optional)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={labelForm.amount}
+                            onChange={(e) => setLabelForm({ ...labelForm, amount: e.target.value })}
+                            placeholder="0.00"
+                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Notes (optional)
+                          </label>
+                          <textarea
+                            value={labelForm.notes}
+                            onChange={(e) => setLabelForm({ ...labelForm, notes: e.target.value })}
+                            placeholder="Additional notes..."
+                            rows="2"
+                            className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleAddLabel}
+                            className="bg-blue-900 text-white px-4 py-2 rounded-lg hover:bg-blue-800"
+                          >
+                            Save Label
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowAddLabel(false);
+                              setLabelForm({ label_type: '', amount: '', notes: '' });
+                            }}
+                            className="bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Labels List */}
+                  <div className="space-y-2">
+                    {userDetails.labels && userDetails.labels.length > 0 ? (
+                      userDetails.labels.map((label) => (
+                        <div key={label.id} className="p-3 bg-gray-50 rounded border border-gray-200">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="inline-block px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
+                                  {label.label_type}
+                                </span>
+                                {label.amount && (
+                                  <span className="text-sm font-medium text-green-600">
+                                    €{parseFloat(label.amount).toFixed(2)}
+                                  </span>
+                                )}
+                              </div>
+                              {label.notes && (
+                                <p className="text-sm text-gray-600 mt-1">{label.notes}</p>
+                              )}
+                              <p className="text-xs text-gray-400 mt-1">
+                                {new Date(label.created_at).toLocaleDateString()} at {new Date(label.created_at).toLocaleTimeString()}
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => handleDeleteLabel(label.id)}
+                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                              title="Delete label"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500 text-center py-4">No labels added</p>
+                    )}
+                  </div>
+                </div>
+
                 {/* Documents */}
                 <div className="mb-6">
                   <h3 className="font-semibold mb-3 flex items-center">
@@ -729,13 +931,29 @@ const AdminDashboard = ({ onLogout }) => {
                   <div className="space-y-2">
                     {userDetails.documents.map((doc) => (
                       <div key={doc.id} className="p-3 bg-gray-50 rounded flex justify-between items-center">
-                        <div>
+                        <div className="flex-1">
                           <p className="font-medium text-sm">{doc.type}</p>
                           <p className="text-xs text-gray-600">{doc.filename}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {new Date(doc.uploaded_at).toLocaleDateString()}
+                          </p>
                         </div>
-                        <p className="text-xs text-gray-500">
-                          {new Date(doc.uploaded_at).toLocaleDateString()}
-                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleDocumentView(doc.id, doc.filename)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="View document"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDocumentDownload(doc.id, doc.filename)}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded transition-colors"
+                            title="Download document"
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                     {userDetails.documents.length === 0 && (
@@ -758,7 +976,14 @@ const AdminDashboard = ({ onLogout }) => {
                       </label>
                       <select
                         value={updateForm.status}
-                        onChange={(e) => setUpdateForm({ ...updateForm, status: e.target.value })}
+                        onChange={(e) => {
+                          const selectedStatus = statusOptions.find(opt => opt.value === e.target.value);
+                          setUpdateForm({
+                            ...updateForm,
+                            status: e.target.value,
+                            progress_percentage: selectedStatus ? selectedStatus.progress : updateForm.progress_percentage
+                          });
+                        }}
                         className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                       >
                         <option value="">Select status...</option>

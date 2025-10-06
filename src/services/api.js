@@ -94,5 +94,8 @@ export const adminAPI = {
   getUserDetails: (userId) => api.get(`/admin/users/${userId}`),
   updateApplicationStatus: (data) => api.put('/admin/application/update', data),
   getStatistics: () => api.get('/admin/statistics'),
+  addUserLabel: (data) => api.post('/admin/labels', data),
+  getUserLabels: (userId) => api.get(`/admin/labels/${userId}`),
+  deleteUserLabel: (labelId) => api.delete(`/admin/labels/${labelId}`),
 };
 
